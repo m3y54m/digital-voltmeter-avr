@@ -6,10 +6,10 @@ Automatic Program Generator
 http://www.hpinfotech.com
 
 Project : Digital Voltmeter
-Version : 
-Date    : 12/5/2013
+Version : 2.0
+Date    : 1393 Esfand 21
 Author  : Meysam Parvizi
-Company : University of Zanjan Robotics Association
+Company : 
 Comments: 
 
 
@@ -25,79 +25,63 @@ Data Stack size         : 256
 
 #include <delay.h>
 
-#define ADC_VREF_TYPE 0x00
+// Voltage Reference: AVCC pin
+#define ADC_VREF_TYPE ((0<<REFS1) | (1<<REFS0) | (0<<ADLAR))
+
+unsigned char digits[10] = {0b00111111,0b00000110,0b01011011,0b01001111,0b01100110,0b01101101,0b01111101,0b00000111,0b01111111,0b01101111};
+float x = 0;
+unsigned char i=0;
+
+void shiftPORTB(unsigned char i)
+{
+   switch (i)
+   {
+      case 0:
+         PORTB = 0b00001110;
+         break;
+      case 1:
+         PORTB = 0b00001101;
+         break;
+      case 2:
+         PORTB = 0b00001011;
+         break;
+      case 3:
+         PORTB = 0b00000111;
+         break;   
+   }
+}
 
 // Read the AD conversion result
 unsigned int read_adc(unsigned char adc_input)
 {
-ADMUX=adc_input | (ADC_VREF_TYPE & 0xff);
+ADMUX=adc_input | ADC_VREF_TYPE;
 // Delay needed for the stabilization of the ADC input voltage
 delay_us(10);
 // Start the AD conversion
-ADCSRA|=0x40;
+ADCSRA|=(1<<ADSC);
 // Wait for the AD conversion to complete
-while ((ADCSRA & 0x10)==0);
-ADCSRA|=0x10;
+while ((ADCSRA & (1<<ADIF))==0);
+ADCSRA|=(1<<ADIF);
 return ADCW;
 }
 
-void digit(unsigned char mnum)
+// Timer 0 overflow interrupt service routine
+interrupt [TIM0_OVF] void timer0_ovf_isr(void)
 {
-    switch (mnum)
-    {
-        case 0:
-            PORTD = 0b00111111;
-            break;
-        case 1:
-            PORTD = 0b00000110;
-            break;    
-        case 2:
-            PORTD = 0b01011011;
-            break;     
-        case 3:
-            PORTD = 0b01001111;
-            break;
-        case 4:
-            PORTD = 0b01100110;
-            break;    
-        case 5:
-            PORTD = 0b01101101;
-            break;    
-        case 6:
-            PORTD = 0b01111101;
-            break;    
-        case 7:
-            PORTD = 0b00000111;
-            break;
-        case 8:
-            PORTD = 0b01111111;
-            break;
-        case 9:
-            PORTD = 0b01101111;
-            break;
-        case 10:
-            PORTD = 0b00000000;
-    }
-}
+// Place your code here
 
-void dot(unsigned char ch)
-{
-    if (ch == 1)
-        PORTD.7 = 1;
-    else
-        if (ch == 0)
-            PORTD.7 = 0;
-}
 
-void print_number(float input_num, unsigned int delay_t)
-{
-    unsigned char n1;
-    unsigned char n2;
-    unsigned char n3;
-    unsigned char n4;
+
+/*******************************************************************/
+
+    unsigned char n[4];
     unsigned int temp;
-
-    if (input_num <= -100 || input_num >= 100)
+    unsigned char signFlag=0;
+    float tempx;
+        
+    tempx = x;
+    
+    if (tempx <= -100 || tempx >= 100)
     {
         PORTB.0 = 1;
         PORTB.1 = 1;
@@ -106,113 +90,54 @@ void print_number(float input_num, unsigned int delay_t)
     }
     else
     {
-        if (input_num >= 0)
+        if (tempx < 0)
         {   
-            if (input_num == 0)
-            {
-                n4 = 0;
-                n3 = 0;
-                n2 = 0;
-                n1 = 0;
-            }
-            else
-            {
-                temp = input_num * 100;
-                n4 = temp / 1000;
-                temp = temp - n4 * 1000;
-                n3 = temp / 100;
-                temp = temp - n3 * 100;
-                n2 = temp / 10;
-                n1 = temp - n2 * 10;
-            }
-            
-            PORTB.0 = 0;
-            digit(n1);
-            delay_ms(delay_t);
-            PORTB.0 = 1;
-            PORTB.1 = 0;
-            digit(n2);
-            delay_ms(delay_t);
-            PORTB.1 = 1;
-            PORTB.2 = 0;
-            digit(n3);
-            dot(1);
-            delay_ms(delay_t);
-            PORTB.2 = 1;
-            PORTB.3 = 0;
-            digit(n4);
-            delay_ms(delay_t);
-            PORTB.3 = 1;
+            tempx = -tempx;
+            signFlag=1;
         }
         else
         {
-            input_num = -input_num;
-            if (input_num == 0)
-            {
-                n4 = 0;
-                n3 = 0;
-                n2 = 0;
-                n1 = 0;
-            }
-            else
-            {
-                temp = input_num * 100;
-                n4 = temp / 1000;
-                temp = temp - n4 * 1000;
-                n3 = temp / 100;
-                temp = temp - n3 * 100;
-                n2 = temp / 10;
-                n1 = temp - n2 * 10;
-            }
-            
-            PORTB.0 = 0;
-            digit(n1);
-            dot(1);
-            delay_ms(delay_t);
-            PORTB.0 = 1;
-            PORTB.1 = 0;
-            digit(n2);
-            delay_ms(delay_t);
-            PORTB.1 = 1;
-            PORTB.2 = 0;
-            digit(n3);
-            dot(1);
-            delay_ms(delay_t);
-            PORTB.2 = 1;
-            PORTB.3 = 0;
-            digit(n4);
-            delay_ms(delay_t);
-            PORTB.3 = 1;
-            
+            signFlag=0;
         }
-    }
-}
+        
+         if (tempx == 0)
+         {
+             n[3] = 0;
+             n[2] = 0;
+             n[1] = 0;
+             n[0] = 0;
+         }
+         else
+         {
+             temp = tempx * 100;
+             n[3] = temp / 1000;
+             temp = temp - n[3] * 1000;
+             n[2] = temp / 100;
+             temp = temp - n[2] * 100;
+             n[1] = temp / 10;
+             n[0] = temp - n[1] * 10;
+         }
 
-void print_error(unsigned int delay_t)
-{
-    PORTB.0 = 0;
-    PORTD = 0b01010000;
-    delay_ms(delay_t);
-    PORTB.0 = 1;
-    PORTB.1 = 0;
-    PORTD = 0b01010000;
-    delay_ms(delay_t);
-    PORTB.1 = 1;
-    PORTB.2 = 0;
-    PORTD = 0b01111001;
-    delay_ms(delay_t);
-    PORTB.2 = 1;
-    PORTB.3 = 1;
-    delay_ms(delay_t);
-}
-            
-// Declare your global variables here
+         PORTD = digits[n[i]];
+         
+         if (i==0)
+         {
+            if (signFlag) PORTD.7=1; else  PORTD.7=0;
+         }
+         
+         if (i==2) PORTD.7=1;
+          
+         shiftPORTB(i);
+         i++;
+         if (i==4) i=0;
+    }
+
+/******************************************************************/
+
+}          
 
 void main(void)
 {
-// Declare your local variables here
-float x = 0;
-unsigned int dt = 1;
 
 // Input/Output Ports initialization
 // Port B initialization
@@ -235,8 +160,8 @@ DDRD=0xFF;
 
 // Timer/Counter 0 initialization
 // Clock source: System Clock
-// Clock value: Timer 0 Stopped
-TCCR0=0x00;
+// Clock value: 125.000 kHz
+TCCR0=(0<<CS02) | (1<<CS01) | (1<<CS00);
 TCNT0=0x00;
 
 // Timer/Counter 1 initialization
@@ -278,7 +203,8 @@ OCR2=0x00;
 MCUCR=0x00;
 
 // Timer(s)/Counter(s) Interrupt(s) initialization
-TIMSK=0x00;
+TIMSK=(0<<OCIE2) | (0<<TOIE2) | (0<<TICIE1) | (0<<OCIE1A) | (0<<OCIE1B) | (0<<TOIE1) | (1<<TOIE0);
+
 
 // Analog Comparator initialization
 // Analog Comparator: Off
@@ -288,18 +214,24 @@ SFIOR=0x00;
 
 // ADC initialization
 // ADC Clock frequency: 125.000 kHz
-// ADC Voltage Reference: AREF pin
-ADMUX=ADC_VREF_TYPE & 0xff;
-ADCSRA=0x86;
+// ADC Voltage Reference: AVCC pin
+ADMUX=ADC_VREF_TYPE;
+ADCSRA=(1<<ADEN) | (0<<ADSC) | (0<<ADFR) | (0<<ADIF) | (0<<ADIE) | (1<<ADPS2) | (1<<ADPS1) | (0<<ADPS0);
+SFIOR=(0<<ACME);
+
+// Global enable interrupts
+#asm("sei")
+
+PORTB=0b00001110;
 
 while (1)
       {
-      dt = 1;
-      x = ((float)read_adc(5) * 4.88) / 1024;
-      x = (x - 2.40185) * 10.43478;
-      if (x > 25 || x < -25)
-        print_error(dt);
-      else       
-        print_number(x,dt);
+
+      x = ((float)read_adc(5) * 4.93) / 1023;
+      x = (x - 2.428) * 10.43478;
+      delay_ms(200);
+
+      
+      
       };
 }
